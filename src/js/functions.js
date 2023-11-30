@@ -1,0 +1,1 @@
+function createMarkup(images) {}
