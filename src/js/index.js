@@ -1,32 +1,61 @@
-import getImages from './PixabayApi.js';
 import Notiflix from 'notiflix';
+import PixabayApi from './PixabayApi.js';
+import { createMarkup, updateGalleryList } from './markup.js';
+import LoadMoreBtn from './LoadMoreBtn.js';
 
 const formEl = document.getElementById('search-form');
-
 const galleryEl = document.querySelector('.gallery');
+const API = new PixabayApi();
+const loadMoreBtn = new LoadMoreBtn({
+  selector: '#loadMoreBtn',
+  isHidden: true,
+});
 
+// Submit event //
 formEl.addEventListener('submit', onSubmit);
 
-async function onSubmit(event) {
-  debugger;
+function onSubmit(event) {
   event.preventDefault();
+  const searchTerm = formEl.elements.searchQuery.value.trim();
 
-  const searchTerm = formEl.elements.searchQuery.value;
+  if (searchTerm === '') {
+    Notiflix.Notify.info('Please, write something');
+    return;
+  }
 
-  clearGalleryList();
+  setApi(searchTerm);
+  clear();
+  loadData();
+}
 
+function setApi(searchTerm) {
+  API.searchQuery = searchTerm;
+  API.page = 1;
+}
+
+function clear() {
+  galleryEl.innerHTML = '';
+  formEl.reset();
+  loadMoreBtn.hide();
+}
+
+async function loadData() {
   try {
-    const images = await getImages(searchTerm);
+    const data = await API.getImages();
 
-    if (images.length === 0) {
+    if (data.totalHits === 0) {
       onError(
         'Sorry, there are no images matching your search query. Please try again.'
       );
       return;
     }
 
-    const markup = createMarkup(images);
+    const markup = createMarkup(data.hits);
     updateGalleryList(markup);
+
+    Notiflix.Notify.success(`Hooray! We found ${data.totalHits} images.`);
+    loadMoreBtn.show();
+    handleSmoothScroll();
   } catch (error) {
     onError(error.message);
   }
@@ -37,66 +66,43 @@ function onError(error) {
   updateGalleryList(`<p>${error}</p>`);
 }
 
-// function createMarkup(images) {
-//   const markup = images
-//     .map(image => {
-//       const {
-//         webformatURL,
-//         largeImageURL,
-//         tags,
-//         likes,
-//         views,
-//         comments,
-//         downloads,
-//       } = image;
+function handleSmoothScroll() {
+  const { height: cardHeight } = document
+    .querySelector('.gallery')
+    .firstElementChild.getBoundingClientRect();
 
-//       return;
-//     })
-//     .join();
-
-//   return markup;
-// }
-
-function createMarkup(images) {
-  return images
-    .map(image => {
-      const {
-        webformatURL,
-        largeImageURL,
-        tags,
-        likes,
-        views,
-        comments,
-        downloads,
-      } = image;
-
-      return `
-      <div class="photo-card">
-        <img src=${webformatURL} alt=${tags} loading="lazy" />
-        <div class="info">
-          <p class="info-item">
-            <b>Likes</b>${likes}
-          </p>
-          <p class="info-item">
-            <b>Views</b>${views}
-          </p>
-          <p class="info-item">
-            <b>Comments</b>${comments}
-          </p>
-          <p class="info-item">
-            <b>Downloads</b>${downloads}
-          </p>
-        </div>
-      </div>;
-      `;
-    })
-    .join('');
+  window.scrollBy({
+    top: cardHeight * 1.5,
+    behavior: 'smooth',
+  });
 }
 
-function updateGalleryList(markup) {
-  galleryEl.innerHTML += markup;
+// Click event (load more) //
+loadMoreBtn.button.addEventListener('click', onClick);
+
+function onClick() {
+  loadMoreBtn.disable();
+  loadMoreData();
 }
 
-function clearGalleryList() {
-  galleryEl.innerHTML = '';
+async function loadMoreData() {
+  try {
+    const data = await API.getImages();
+    const images = await data.hits;
+
+    if (images.length === 0) {
+      onError("We're sorry, but you've reached the end of search results.");
+      loadMoreBtn.enable();
+      loadMoreBtn.hide();
+      return;
+    }
+
+    const markup = createMarkup(images);
+    updateGalleryList(markup);
+
+    loadMoreBtn.enable();
+    handleSmoothScroll();
+  } catch (error) {
+    onError(error.message);
+  }
 }
