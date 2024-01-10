@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const ENDPOINT = 'https://pixabay.com/api/';
-const API_KEY = '40980203-bf5d380b1e5580ea318d0b451';
+const API_KEY = '41738321-a8f823d3708a3beef3432afb9';
 
 const searchParams = new URLSearchParams({
   key: API_KEY,
